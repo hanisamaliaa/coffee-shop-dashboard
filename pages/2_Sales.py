@@ -5,7 +5,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.data_loader import load_data, get_filter_options, apply_filters
+from utils.data_loader import load_data, get_filter_options, apply_filters, check_empty_data
 from utils.formatting import format_currency, format_number, format_percentage
 from utils.charts import line_chart, bar_chart, horizontal_bar
 
@@ -20,10 +20,7 @@ st.caption("Tren penjualan, revenue, transaksi, dan pola kontribusi")
 df = load_data()
 options = get_filter_options(df)
 df_filtered = apply_filters(df, options, key_prefix="sales")
-
-if df_filtered.empty:
-    st.warning("Data kosong setelah filter diterapkan. Silakan ubah filter.")
-    st.stop()
+check_empty_data(df_filtered, "Sales")
 
 st.markdown("## KPI Overview")
 
@@ -161,9 +158,18 @@ with col_a2:
 
 st.markdown("---")
 st.subheader("Download Data")
-st.download_button(
-    "Download Monthly Sales Summary (CSV)",
-    data=monthly.to_csv(index=False),
-    file_name="monthly_sales_summary.csv",
-    mime="text/csv",
-)
+col_dl1, col_dl2 = st.columns(2)
+with col_dl1:
+    st.download_button(
+        "Download Monthly Sales Summary (CSV)",
+        data=monthly.to_csv(index=False),
+        file_name="monthly_sales_summary.csv",
+        mime="text/csv",
+    )
+with col_dl2:
+    st.download_button(
+        "Download Category Summary (CSV)",
+        data=cat_rev.to_csv(index=False),
+        file_name="category_summary.csv",
+        mime="text/csv",
+    )

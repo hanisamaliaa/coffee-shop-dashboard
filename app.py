@@ -24,16 +24,10 @@ st.markdown("""
         padding: 1rem 0;
     }
     .sub-header {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         color: #555;
         text-align: center;
         margin-bottom: 2rem;
-    }
-    .section-box {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 0.5rem 0;
     }
     .page-card {
         background: #ffffff;
@@ -52,23 +46,23 @@ st.markdown("---")
 
 df = load_data()
 
-col_info1, col_info2, col_info3, col_info4 = st.columns(4)
-with col_info1:
+col1, col2, col3, col4 = st.columns(4)
+with col1:
     st.metric("Total Records", format_number(len(df)))
-with col_info2:
+with col2:
     st.metric("Total Revenue", format_currency(df["total_amount"].sum()))
-with col_info3:
+with col3:
     total_txn = df["transaction_id"].nunique() if "transaction_id" in df.columns else len(df)
     st.metric("Transactions", format_number(total_txn))
-with col_info4:
+with col4:
     if "timestamp" in df.columns and df["timestamp"].notna().any():
         st.metric("Period", format_date_range(df["timestamp"].min(), df["timestamp"].max()))
 
 st.markdown("---")
 
-col1, col2 = st.columns(2)
+col_l, col_r = st.columns(2)
 
-with col1:
+with col_l:
     st.markdown("### :bar_chart: Dashboard Sections")
     st.markdown("""
     | Halaman | Fokus Analisis |
@@ -81,15 +75,18 @@ with col1:
     | :clock1: **Time & Performance** | Pola waktu, jam, hari, & musiman |
     """)
 
-with col2:
+with col_r:
     st.markdown("### :information_source: Dataset Information")
     n_cols = len(df.columns)
     countries = df["country"].nunique() if "country" in df.columns else "-"
     cities = df["city"].nunique() if "city" in df.columns else "-"
     products = df["product_name"].nunique() if "product_name" in df.columns else "-"
+    period = "-"
+    if "timestamp" in df.columns and df["timestamp"].notna().any():
+        period = format_date_range(df["timestamp"].min(), df["timestamp"].max())
     st.markdown(f"""
     - **Source**: Coffee Shop Sales Transaction Dataset
-    - **Period**: {format_date_range(df['timestamp'].min(), df['timestamp'].max()) if 'timestamp' in df.columns else '-'}
+    - **Period**: {period}
     - **Records**: {len(df):,} transaksi
     - **Features**: {n_cols} kolom setelah feature engineering
     - **Countries**: {countries} negara

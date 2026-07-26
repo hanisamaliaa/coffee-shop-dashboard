@@ -5,7 +5,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.data_loader import load_data, get_filter_options, apply_filters
+from utils.data_loader import load_data, get_filter_options, apply_filters, check_empty_data
 from utils.formatting import format_currency, format_number, format_percentage
 from utils.charts import horizontal_bar, bar_chart, pie_chart
 
@@ -20,10 +20,7 @@ st.caption("Segmen pelanggan, perilaku transaksi, dan loyalitas")
 df = load_data()
 options = get_filter_options(df)
 df_filtered = apply_filters(df, options, key_prefix="cust")
-
-if df_filtered.empty:
-    st.warning("Data kosong setelah filter diterapkan. Silakan ubah filter.")
-    st.stop()
+check_empty_data(df_filtered, "Customer")
 
 st.markdown("## KPI Overview")
 
@@ -75,13 +72,17 @@ with col1:
 with col2:
     st.subheader("Customer Frequency Segment")
     if "customer_segment" in df_filtered.columns:
-        seg_counts = df_filtered["customer_segment"].value_counts().reset_index()
-        seg_counts.columns = ["customer_segment", "count"]
-        fig2 = pie_chart(
-            seg_counts, "customer_segment", "count",
-            title="Customer Segment Distribution"
+        seg_stats = df_filtered.groupby("customer_segment").agg(
+            n_customers=("customer_id", "nunique"),
+            revenue=("total_amount", "sum"),
+        ).reset_index()
+        seg_stats = seg_stats.sort_values("revenue", ascending=False)
+
+        fig2 = bar_chart(
+            seg_stats, "customer_segment", "revenue",
+            title="Revenue by Customer Segment"
         )
-        fig2.update_layout(height=380)
+        fig2.update_layout(height=380, xaxis_title="Segment", yaxis_title="Revenue ($)")
         st.plotly_chart(fig2, use_container_width=True)
     else:
         st.info("Kolom customer_segment tidak tersedia")

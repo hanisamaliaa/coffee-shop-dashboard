@@ -5,9 +5,9 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.data_loader import load_data, get_filter_options, apply_filters
-from utils.formatting import format_currency, format_number, format_percentage, format_date_range
-from utils.charts import line_chart, bar_chart, pie_chart
+from utils.data_loader import load_data, get_filter_options, apply_filters, check_empty_data
+from utils.formatting import format_currency, format_number, format_percentage, format_date_range, format_delta
+from utils.charts import line_chart, pie_chart, dual_axis_chart
 
 st.set_page_config(
     page_title="Executive Summary - Coffee Shop Dashboard",
@@ -20,26 +20,20 @@ st.caption("Kondisi bisnis secara keseluruhan dalam satu tampilan")
 df = load_data()
 options = get_filter_options(df)
 df_filtered = apply_filters(df, options, key_prefix="exec")
+check_empty_data(df_filtered, "Executive Summary")
 
-if df_filtered.empty:
-    st.warning("Data kosong setelah filter diterapkan. Silakan ubah filter.")
-    st.stop()
-
-st.markdown("---")
-
-col_date1, col_date2 = st.columns(2)
-with col_date1:
-    st.caption(
-        f"Date range: {format_date_range(df_filtered['timestamp'].min(), df_filtered['timestamp'].max())}"
-    )
-with col_date2:
-    st.caption(f"Total records: {len(df_filtered):,}")
+st.caption(
+    f"Periode: {format_date_range(df_filtered['timestamp'].min(), df_filtered['timestamp'].max())} | "
+    f"Total: {len(df_filtered):,} transaksi"
+)
 
 st.markdown("## Key Performance Indicators")
 
 total_revenue = df_filtered["total_amount"].sum()
 total_transactions = df_filtered["transaction_id"].nunique()
 avg_transaction = total_revenue / total_transactions if total_transactions > 0 else 0
+total_quantity = int(df_filtered["quantity"].sum())
+
 best_product = (
     df_filtered.groupby("product_name")["total_amount"]
     .sum()
@@ -49,11 +43,8 @@ best_product = (
 )
 
 prev_month_cutoff = df_filtered["timestamp"].max() - pd.DateOffset(months=1)
-df_prev = df[
-    (df["timestamp"] >= df_filtered["timestamp"].min()) &
-    (df["timestamp"] < prev_month_cutoff)
-]
 df_curr = df_filtered[df_filtered["timestamp"] >= prev_month_cutoff]
+df_prev = df_filtered[df_filtered["timestamp"] < prev_month_cutoff]
 
 rev_curr = df_curr["total_amount"].sum()
 rev_prev = df_prev["total_amount"].sum()
@@ -69,34 +60,38 @@ with kpi1:
     st.metric(
         "Total Revenue",
         format_currency(total_revenue),
-        delta=f"{delta_rev:.1f}%" if delta_rev is not None else None,
+        delta=format_delta(delta_rev),
     )
 with kpi2:
     st.metric(
         "Total Transactions",
         format_number(total_transactions),
-        delta=f"{delta_txn:.1f}%" if delta_txn is not None else None,
+        delta=format_delta(delta_txn),
     )
 with kpi3:
     st.metric("Average Transaction Value", format_currency(avg_transaction))
 with kpi4:
-    display_name = best_product if len(best_product) <= 25 else best_product[:22] + "..."
-    st.metric("Best-Selling Product", display_name)
+    display_product = best_product if len(best_product) <= 25 else best_product[:22] + "..."
+    st.metric("Best-Selling Product", display_product)
 
 st.markdown("---")
 
 col_main, col_support = st.columns([2, 1])
 
 with col_main:
-    st.subheader("Revenue & Transaction Trend")
+    st.subheader("Revenue & Transaction Trend (Monthly)")
     monthly = df_filtered.groupby(df_filtered["timestamp"].dt.to_period("M")).agg(
         revenue=("total_amount", "sum"),
         transactions=("transaction_id", "nunique"),
     ).reset_index()
     monthly["timestamp"] = monthly["timestamp"].dt.to_timestamp()
 
-    fig1 = line_chart(monthly, "timestamp", "revenue", title="Monthly Revenue Trend")
-    fig1.update_layout(xaxis_title="Month", yaxis_title="Revenue ($)", height=380)
+    fig1 = dual_axis_chart(
+        monthly, "timestamp", "revenue", "transactions",
+        title="Monthly Revenue (Bar) & Transactions (Line)",
+        y1_label="Revenue ($)", y2_label="Transactions"
+    )
+    fig1.update_layout(height=380)
     st.plotly_chart(fig1, use_container_width=True)
 
 with col_support:
@@ -129,25 +124,30 @@ top_country_rev = (
     if "country" in df_filtered.columns
     else 0
 )
+total_rev = df_filtered["total_amount"].sum()
+top_country_pct = top_country_rev / total_rev * 100
 
 col_i1, col_i2, col_i3 = st.columns(3)
 
 with col_i1:
+    rev_range = top_month["revenue"] - bottom_month["revenue"]
     st.info(
-        f"**Peak Revenue Month**: {top_month['timestamp'].strftime('%B %Y')} "
-        f"dengan {format_currency(top_month['revenue'])}"
+        f"**Revenue Gap Bulanan**: {format_currency(rev_range)} antara "
+        f"bulan tertinggi ({top_month['timestamp'].strftime('%B')}) dan "
+        f"terendah ({bottom_month['timestamp'].strftime('%B')})"
     )
 
 with col_i2:
     st.info(
-        f"**Lowest Revenue Month**: {bottom_month['timestamp'].strftime('%B %Y')} "
-        f"dengan {format_currency(bottom_month['revenue'])}"
+        f"**Top Country**: {top_country} berkontribusi "
+        f"{format_currency(top_country_rev)} ({format_percentage(top_country_pct)})"
     )
 
 with col_i3:
+    avg_txn_all = total_revenue / total_transactions if total_transactions > 0 else 0
     st.info(
-        f"**Top Performing Country**: {top_country} - "
-        f"{format_currency(top_country_rev)}"
+        f"**Average Transaction**: {format_currency(avg_txn_all)} per transaksi "
+        f"dari {format_number(total_transactions)} total transaksi"
     )
 
 st.markdown("## Recommended Actions")
@@ -164,16 +164,18 @@ with col_a1:
 with col_a2:
     top_cat_name = cat_rev.iloc[0]["product_category"]
     top_cat_rev = cat_rev.iloc[0]["total_amount"]
+    top_cat_pct = top_cat_rev / total_rev * 100
     st.warning(
-        f"**2. Optimasi Kategori Terlaris**\n\n"
-        f"Kategori {top_cat_name} mendominasi dengan {format_currency(top_cat_rev)}. "
+        f"**2. Optimasi Kategori {top_cat_name}**\n\n"
+        f"Kategori ini berkontribusi {format_percentage(top_cat_pct)} dari total revenue. "
         f"Pertahankan kualitas dan eksplorasi varian baru."
     )
 
 with col_a3:
     st.warning(
         f"**3. Perluas ke {top_country}**\n\n"
-        f"{top_country} menunjukkan performa terbaik. "
+        f"{top_country} menunjukkan performa terbaik dengan "
+        f"{format_currency(top_country_rev)}. "
         f"Pertimbangkan ekspansi atau peningkatan kapasitas."
     )
 

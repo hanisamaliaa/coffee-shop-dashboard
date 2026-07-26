@@ -5,7 +5,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.data_loader import load_data, get_filter_options, apply_filters
+from utils.data_loader import load_data, get_filter_options, apply_filters, check_empty_data
 from utils.formatting import format_currency, format_number, format_percentage
 from utils.charts import horizontal_bar, bar_chart, pie_chart
 
@@ -20,10 +20,7 @@ st.caption("Performa produk, kategori, dan dampak diskon")
 df = load_data()
 options = get_filter_options(df)
 df_filtered = apply_filters(df, options, key_prefix="product")
-
-if df_filtered.empty:
-    st.warning("Data kosong setelah filter diterapkan. Silakan ubah filter.")
-    st.stop()
+check_empty_data(df_filtered, "Product")
 
 st.markdown("## KPI Overview")
 
@@ -105,12 +102,12 @@ with col4:
             avg_value=("total_amount", "mean"),
             count=("transaction_id", "nunique"),
         ).reset_index()
-        disc_stats["discount_applied"] = disc_stats["discount_applied"].map(
+        disc_stats["label"] = disc_stats["discount_applied"].map(
             {True: "Discount", False: "No Discount"}
         )
 
         fig5 = bar_chart(
-            disc_stats, "discount_applied", "revenue",
+            disc_stats, "label", "revenue",
             title="Revenue: Discount vs Non-Discount"
         )
         fig5.update_layout(height=350)

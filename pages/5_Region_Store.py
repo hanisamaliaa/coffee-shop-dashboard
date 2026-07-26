@@ -5,7 +5,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.data_loader import load_data, get_filter_options, apply_filters
+from utils.data_loader import load_data, get_filter_options, apply_filters, check_empty_data
 from utils.formatting import format_currency, format_number, format_percentage
 from utils.charts import bar_chart, horizontal_bar, pie_chart, heatmap_chart
 
@@ -20,10 +20,7 @@ st.caption("Performa negara, kota, toko, dan tipe toko")
 df = load_data()
 options = get_filter_options(df)
 df_filtered = apply_filters(df, options, key_prefix="region")
-
-if df_filtered.empty:
-    st.warning("Data kosong setelah filter diterapkan. Silakan ubah filter.")
-    st.stop()
+check_empty_data(df_filtered, "Region & Store")
 
 st.markdown("## KPI Overview")
 
@@ -121,6 +118,7 @@ store_type_stats = df_filtered.groupby("store_type").agg(
     revenue=("total_amount", "sum"),
     transactions=("transaction_id", "nunique"),
     avg_transaction=("total_amount", "mean"),
+    n_stores=("store_id", "nunique"),
 ).reset_index()
 
 fig5 = bar_chart(
@@ -166,13 +164,13 @@ st.markdown("---")
 
 st.subheader("Key Insights")
 
+total_rev = df_filtered["total_amount"].sum()
 top_city_rev = city_rev.iloc[0]["total_amount"]
 bot_city_rev = city_rev.iloc[-1]["total_amount"]
 store_type_top = store_type_stats.loc[
     store_type_stats["revenue"].idxmax(), "store_type"
 ]
 rev_gap = country_rev["total_amount"].max() - country_rev["total_amount"].min()
-total_rev = df_filtered["total_amount"].sum()
 top_city_pct = top_city_rev / total_rev * 100
 
 col_i1, col_i2, col_i3 = st.columns(3)

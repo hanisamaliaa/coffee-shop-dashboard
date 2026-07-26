@@ -6,7 +6,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.data_loader import load_data, get_filter_options, apply_filters
+from utils.data_loader import load_data, get_filter_options, apply_filters, check_empty_data
 from utils.formatting import format_currency, format_number, format_percentage
 from utils.charts import line_chart, bar_chart, heatmap_chart
 
@@ -21,10 +21,7 @@ st.caption("Pola waktu, jam, hari, musiman, dan rekomendasi operasional")
 df = load_data()
 options = get_filter_options(df)
 df_filtered = apply_filters(df, options, key_prefix="time")
-
-if df_filtered.empty:
-    st.warning("Data kosong setelah filter diterapkan. Silakan ubah filter.")
-    st.stop()
+check_empty_data(df_filtered, "Time & Performance")
 
 st.markdown("## KPI Overview")
 
@@ -157,6 +154,7 @@ st.subheader("Key Insights")
 peak_day_name = daily.loc[daily["revenue"].idxmax(), "day_name"]
 peak_day_rev = daily.loc[daily["revenue"].idxmax(), "revenue"]
 low_day_name = daily.loc[daily["revenue"].idxmin(), "day_name"]
+low_day_rev = daily.loc[daily["revenue"].idxmin(), "revenue"]
 avg_weekday = weekend_merged[weekend_merged["label"] == "Weekday"][
     "avg_daily_revenue"
 ].values[0]
@@ -170,13 +168,17 @@ weekend_lift = (
 col_i1, col_i2, col_i3 = st.columns(3)
 with col_i1:
     st.info(
-        f"**Peak Hour**: {peak_hour}:00 dengan {int(hourly_txn.max())} transaksi"
+        f"**Peak Hour**: Jam {peak_hour}:00 mencatat {int(hourly_txn.max())} transaksi"
     )
 with col_i2:
-    st.info(f"**Best Day**: {peak_day_name} dengan {format_currency(peak_day_rev)} revenue")
+    st.info(
+        f"**Best Day**: {peak_day_name} mencatat {format_currency(peak_day_rev)} revenue, "
+        f"terendah: {low_day_name} ({format_currency(low_day_rev)})"
+    )
 with col_i3:
     st.info(
-        f"**Weekend Lift**: Avg revenue harian weekend {weekend_lift:+.1f}% dari weekday"
+        f"**Weekend Lift**: Rata-rata revenue harian weekend {format_percentage(weekend_lift)} "
+        f"dari weekday"
     )
 
 st.subheader("Recommended Actions")
@@ -189,20 +191,30 @@ with col_a1:
 with col_a2:
     st.warning(
         f"**2. Promosi Hari {low_day_name}**\n\n"
-        f"Hari {low_day_name} berkinerja rendah. Jalankan promosi khusus."
+        f"Hari {low_day_name} berkinerja rendah ({format_currency(low_day_rev)}). "
+        f"Jalankan promosi khusus."
     )
 with col_a3:
     st.warning(
         f"**3. Manfaatkan Weekend Peak**\n\n"
-        f"Weekend naik {weekend_lift:+.1f}% dari weekday. "
+        f"Weekend naik {format_percentage(weekend_lift)} dari weekday. "
         f"Optimalkan stok dan jam operasional."
     )
 
 st.markdown("---")
 st.subheader("Download Data")
-st.download_button(
-    "Download Hourly Summary (CSV)",
-    data=hourly.to_csv(index=False),
-    file_name="hourly_summary.csv",
-    mime="text/csv",
-)
+col_dl1, col_dl2 = st.columns(2)
+with col_dl1:
+    st.download_button(
+        "Download Hourly Summary (CSV)",
+        data=hourly.to_csv(index=False),
+        file_name="hourly_summary.csv",
+        mime="text/csv",
+    )
+with col_dl2:
+    st.download_button(
+        "Download Day of Week Summary (CSV)",
+        data=daily.to_csv(index=False),
+        file_name="day_of_week_summary.csv",
+        mime="text/csv",
+    )

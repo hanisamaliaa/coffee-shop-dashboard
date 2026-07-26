@@ -20,10 +20,8 @@ def load_data():
         st.error(f"Gagal memuat dataset: {e}")
         st.stop()
 
-    date_cols = ["timestamp"]
-    for col in date_cols:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
     if "timestamp" in df.columns and df["timestamp"].notna().any():
         df["date"] = df["timestamp"].dt.date
@@ -96,3 +94,20 @@ def apply_filters(df, options, key_prefix=""):
                 df = df[df[col].isin(vals)]
 
     return df
+
+
+def check_empty_data(df, page_name=""):
+    if df.empty:
+        st.warning(
+            f"Data kosong setelah filter diterapkan pada halaman **{page_name}**. "
+            "Silakan ubah filter di sidebar."
+        )
+        st.stop()
+
+
+def has_cost_column(df):
+    return "cost" in df.columns and df["cost"].notna().any()
+
+
+def has_profit_column(df):
+    return "profit" in df.columns and df["profit"].notna().any()
