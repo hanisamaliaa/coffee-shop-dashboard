@@ -1,0 +1,3 @@
+is_weekend,revenue,transactions,quantity,avg_transaction,label
+False,86746.28,12728,21698,6.8153896920175985,Weekday
+True,50262.99,7272,12555,6.911852310231023,Weekend
