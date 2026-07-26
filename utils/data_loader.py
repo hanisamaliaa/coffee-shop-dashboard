@@ -2,22 +2,33 @@ import streamlit as st
 import pandas as pd
 import os
 
-DATA_PATH = "processed/coffee_shop_sales_featured.csv"
+DATA_SOURCES = [
+    "processed/coffee_shop_sales_featured.csv",
+    "processed/coffee_shop_sales_clean.csv",
+    "coffee_shop_sales.csv",
+    "data/coffee_shop_sales.csv",
+]
 
 
 @st.cache_data
 def load_data():
-    if not os.path.exists(DATA_PATH):
+    loaded_path = None
+    for path in DATA_SOURCES:
+        if os.path.exists(path):
+            loaded_path = path
+            break
+
+    if loaded_path is None:
         st.error(
-            f"File dataset tidak ditemukan: `{DATA_PATH}`.\n\n"
-            "Pastikan file `coffee_shop_sales_featured.csv` tersedia di folder `processed/`."
+            "Dataset not found. Please ensure one of the following files exists:\n"
+            + "\n".join(f"- `{p}`" for p in DATA_SOURCES)
         )
         st.stop()
 
     try:
-        df = pd.read_csv(DATA_PATH)
+        df = pd.read_csv(loaded_path)
     except Exception as e:
-        st.error(f"Gagal memuat dataset: {e}")
+        st.error(f"Failed to load dataset: {e}")
         st.stop()
 
     if "timestamp" in df.columns:
@@ -29,6 +40,15 @@ def load_data():
         df["month_num"] = df["timestamp"].dt.month
         df["year_month"] = df["timestamp"].dt.to_period("M")
 
+    required_cols = [
+        "transaction_id", "total_amount", "quantity", "product_name",
+        "product_category", "timestamp",
+    ]
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        st.error(f"Missing required columns: {', '.join(missing)}")
+        st.stop()
+
     return df
 
 
@@ -36,7 +56,7 @@ def get_filter_options(df):
     options = {}
     filter_cols = [
         "country", "city", "store_type", "product_category",
-        "payment_method", "customer_age_group"
+        "payment_method", "customer_age_group", "customer_gender",
     ]
     for col in filter_cols:
         if col in df.columns:
@@ -54,60 +74,10 @@ def get_filter_options(df):
     return options
 
 
-def apply_filters(df, options, key_prefix=""):
-    st.sidebar.header("Filter")
-
-    date_min = options.get("date_min")
-    date_max = options.get("date_max")
-    if date_min and date_max:
-        date_range = st.sidebar.date_input(
-            "Date Range",
-            value=(date_min, date_max),
-            min_value=date_min,
-            max_value=date_max,
-            key=f"{key_prefix}_date"
-        )
-        if len(date_range) == 2:
-            df = df[
-                (df["timestamp"].dt.date >= date_range[0]) &
-                (df["timestamp"].dt.date <= date_range[1])
-            ]
-
-    filter_mapping = [
-        ("country", "Country"),
-        ("city", "City"),
-        ("store_type", "Store Type"),
-        ("product_category", "Product Category"),
-        ("payment_method", "Payment Method"),
-        ("customer_age_group", "Age Group"),
-    ]
-
-    for col, label in filter_mapping:
-        if col in df.columns and options.get(col):
-            vals = st.sidebar.multiselect(
-                label,
-                options=options[col],
-                default=[],
-                key=f"{key_prefix}_{col}"
-            )
-            if vals:
-                df = df[df[col].isin(vals)]
-
-    return df
-
-
 def check_empty_data(df, page_name=""):
     if df.empty:
         st.warning(
-            f"Data kosong setelah filter diterapkan pada halaman **{page_name}**. "
-            "Silakan ubah filter di sidebar."
+            f"Data is empty after filters are applied on **{page_name}**. "
+            "Please adjust filters in the sidebar."
         )
         st.stop()
-
-
-def has_cost_column(df):
-    return "cost" in df.columns and df["cost"].notna().any()
-
-
-def has_profit_column(df):
-    return "profit" in df.columns and df["profit"].notna().any()
