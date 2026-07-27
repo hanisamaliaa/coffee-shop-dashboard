@@ -1,0 +1,23 @@
+# Tema dikunci ke LIGHT.
+#
+# Tanpa file ini, Streamlit mengikuti setelan dark mode OS/browser pengguna.
+# Masalahnya, seluruh CSS dashboard ini memakai palet terang (kartu putih,
+# teks navy). Kalau Streamlit memilih tema gelap, teks bawaannya menjadi
+# putih di atas kartu putih kita — rasio kontras 1,02:1, praktis tidak terbaca.
+#
+# Gejalanya paling parah di sidebar: label filter (Date Range, Country, City,
+# ...) hilang sama sekali.
+
+[theme]
+base = "light"
+primaryColor = "#0D8A92"            # teal — warna aksen & fokus widget
+backgroundColor = "#FAFAFC"         # latar halaman
+secondaryBackgroundColor = "#FFFFFF"  # latar sidebar & widget
+textColor = "#1F2937"               # abu gelap, kontras 12:1 di latar putih
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

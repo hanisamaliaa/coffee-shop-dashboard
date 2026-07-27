@@ -1,196 +1,261 @@
-import streamlit as st
-import pandas as pd
-import sys
+"""Halaman 4 — Customer Dashboard.
+
+Menjawab: Siapa pelanggan utama? Bagaimana karakteristik dan perilaku belinya?
+Apakah ada segmen pelanggan yang berbeda?
+"""
+
 import os
+import sys
+
+import numpy as np
+import pandas as pd
+import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.data_loader import load_data, get_filter_options, check_empty_data
+from utils.charts import GREY, NAVY, RED, TEAL, _v, compare_bar, ranked_bar
+from utils.data_loader import check_empty_data, get_filter_options, load_data
 from utils.filters import apply_filters
 from utils.formatting import format_currency, format_number_full, format_percentage
-from utils.charts import horizontal_bar, bar_chart
-from utils.styling import (
-    inject_global_css, render_header, render_page_header, render_kpi_card,
-)
+from utils.styling import (inject_global_css, render_caveat, render_header,
+                           render_kpi_card, render_step, render_takeaway)
 
-st.set_page_config(
-    page_title="Customer - Coffee Shop Dashboard",
-    page_icon=":busts_in_silhouette:",
-    layout="wide",
-)
-
+st.set_page_config(page_title="Customer - Coffee Shop Dashboard",
+                   page_icon=":coffee:", layout="wide")
 inject_global_css()
 
 df = load_data()
 options = get_filter_options(df)
 
-render_header(
-    "CUSTOMER ANALYSIS",
-    "Customer segments, demographics, and transaction behavior",
-    "",
-)
+render_header("CUSTOMER DASHBOARD",
+              "Siapa yang membeli, dan apa yang sebenarnya bisa kita ketahui tentang mereka",
+              "Halaman 4 dari 8")
 
-df_filtered = apply_filters(df, options, key_prefix="cust")
-check_empty_data(df_filtered, "Customer")
+df_f = apply_filters(df, options, key_prefix="cust")
+check_empty_data(df_f, "Customer")
 
-unique_customers = df_filtered["customer_id"].nunique()
-total_txn = df_filtered["transaction_id"].nunique()
-cust_txn = df_filtered.groupby("customer_id")["transaction_id"].nunique().reset_index()
-repeat_customers = (cust_txn["transaction_id"] > 1).sum()
-repeat_rate = repeat_customers / unique_customers * 100 if unique_customers > 0 else 0
-avg_rev_per_cust = (
-    df_filtered.groupby("customer_id")["total_amount"].sum().mean()
-    if unique_customers > 0 else 0
-)
+omzet = df_f["total_amount"].sum()
+kunjungan = df_f.groupby("customer_id").size()
+n_pelanggan = len(kunjungan)
+sekali = (kunjungan == 1).mean()
+berulang = (kunjungan > 1).mean()
 
-st.markdown("")
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    render_kpi_card("Unique Customers", format_number_full(unique_customers))
-with col2:
-    render_kpi_card("Repeat Customer Rate", format_percentage(repeat_rate))
-with col3:
-    render_kpi_card("Avg Revenue/Customer", format_currency(avg_rev_per_cust))
-with col4:
-    total_rev = df_filtered["total_amount"].sum()
-    cust_contribution = total_rev / unique_customers if unique_customers > 0 else 0
-    render_kpi_card("Revenue per Customer", format_currency(cust_contribution))
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    render_kpi_card("Pelanggan Unik", format_number_full(n_pelanggan))
+with c2:
+    render_kpi_card("Hanya Datang Sekali", format_percentage(sekali * 100))
+with c3:
+    render_kpi_card("Pelanggan Berulang", format_percentage(berulang * 100))
+with c4:
+    render_kpi_card("Kunjungan Terbanyak", f"{int(kunjungan.max())}x")
 
-st.markdown("")
+# ── Langkah 1 — apa yang sebenarnya bisa diukur ──────────────────────────────
+render_step(1, "Siapa pelanggan yang paling bernilai?",
+            "Sebelum menjawab, kita harus tahu dulu apakah data ini memang bisa "
+            "menjawabnya.")
 
-col_a, col_b = st.columns(2)
-with col_a:
+sebaran = kunjungan.value_counts().sort_index()
+k1, k2 = st.columns([6, 4])
+with k1:
+    import plotly.graph_objects as go
+    fig = go.Figure(go.Bar(
+        x=_v(sebaran.index.astype(str)), y=_v(sebaran.values),
+        marker_color=[RED if i == 1 else TEAL for i in sebaran.index],
+        text=[f"{v:,}" for v in sebaran.values], textposition="outside",
+        cliponaxis=False,
+        hovertemplate="%{x} kunjungan: <b>%{y:,} pelanggan</b><extra></extra>"))
+    fig.update_yaxes(type="log", title="Jumlah pelanggan (skala log)")
+    fig.update_xaxes(title="Jumlah kunjungan dalam periode")
+    fig.update_layout(
+        title=f"{sekali:.0%} pelanggan hanya muncul SEKALI",
+        height=360, plot_bgcolor="white", paper_bgcolor="white",
+        font=dict(family="Inter, sans-serif", size=12, color="#374151"),
+        margin=dict(t=50, b=40, l=60, r=30), showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+with k2:
     st.markdown(
-        "<div class='chart-card'><h3>Top 10 Customers by Revenue</h3></div>",
-        unsafe_allow_html=True,
-    )
-    cust_rev = (
-        df_filtered.groupby("customer_id")
-        .agg(
-            total_revenue=("total_amount", "sum"),
-            transactions=("transaction_id", "nunique"),
-            avg_transaction=("total_amount", "mean"),
-        )
-        .reset_index()
-        .nlargest(10, "total_revenue")
-    )
-    fig1 = horizontal_bar(cust_rev, "total_revenue", "customer_id", title="", top_n=10, height=380)
-    st.plotly_chart(fig1, use_container_width=True)
+        f"""
+        <div style="padding:18px 4px;line-height:1.85;font-size:0.9rem;color:#374151;">
+        <div style="font-size:2.3rem;font-weight:800;color:#D9535F;line-height:1.1;">
+        {sekali:.1%}</div>
+        <div style="color:#6B7280;margin-bottom:16px;">dari {n_pelanggan:,} pelanggan
+        hanya bertransaksi satu kali</div>
+        <b>Konsekuensinya, dari data ini kita TIDAK bisa menghitung:</b><br>
+        • Customer Lifetime Value (CLV)<br>
+        • Tingkat churn<br>
+        • Analisis cohort<br>
+        • "Pelanggan VIP" yang layak diprogramkan<br><br>
+        <b>Yang masih bisa diukur:</b> nilai per <i>transaksi</i>, bukan per
+        <i>pelanggan</i>.
+        </div>
+        """, unsafe_allow_html=True)
 
-with col_b:
-    st.markdown(
-        "<div class='chart-card'><h3>Revenue by Customer Segment</h3></div>",
-        unsafe_allow_html=True,
-    )
-    if "customer_segment" in df_filtered.columns:
-        seg_stats = df_filtered.groupby("customer_segment").agg(
-            n_customers=("customer_id", "nunique"),
-            revenue=("total_amount", "sum"),
-        ).reset_index().sort_values("revenue", ascending=False)
-        fig2 = bar_chart(seg_stats, "customer_segment", "revenue", title="", height=380)
-        fig2.update_layout(xaxis_title="Segment", yaxis_title="Revenue ($)")
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.info("Customer segment data not available")
+render_takeaway(
+    f"<b>Jawaban jujurnya: kita tidak bisa tahu.</b> Dengan {sekali:.1%} pelanggan hanya "
+    f"muncul sekali dan yang paling setia pun cuma {int(kunjungan.max())} kali, tidak ada "
+    f"cukup riwayat untuk menentukan siapa pelanggan bernilai. "
+    f"Ada dua kemungkinan yang <b>tidak bisa kita bedakan</b> dari data ini: "
+    f"(1) memang benar-benar pelanggan sekali datang — wajar untuk lokasi transit, atau "
+    f"(2) <b>customer_id tidak tersimpan lintas kunjungan</b> di sistem kasir. "
+    f"Keduanya menuntut strategi yang sama sekali berbeda. "
+    f"<b>Tindakan: tanyakan ke tim IT sebelum ada angka CLV yang dipresentasikan.</b>",
+    alert=True)
 
-st.markdown("")
+# ── Langkah 2 — yang bisa diukur: nilai transaksi ────────────────────────────
+render_step(2, "Bagaimana perilaku pembelian mereka?",
+            "Karena pelanggan tidak bisa dilacak, kita ukur perilakunya di tingkat "
+            "transaksi.")
 
-col_c, col_d = st.columns(2)
-with col_c:
-    st.markdown(
-        "<div class='chart-card'><h3>Revenue by Age Group</h3></div>",
-        unsafe_allow_html=True,
-    )
-    age_rev = (
-        df_filtered.groupby("customer_age_group")["total_amount"]
-        .sum()
-        .reset_index()
-        .sort_values("total_amount", ascending=False)
-    )
-    fig3 = bar_chart(age_rev, "customer_age_group", "total_amount", title="", height=360)
-    fig3.update_layout(xaxis_title="Age Group", yaxis_title="Revenue ($)")
-    st.plotly_chart(fig3, use_container_width=True)
+k1, k2 = st.columns([5, 5])
+with k1:
+    if "value_segment" in df_f.columns:
+        seg = df_f.groupby("value_segment", observed=True).agg(
+            trx=("total_amount", "size"), omzet=("total_amount", "sum"))
+        seg["porsi"] = seg["omzet"] / omzet
+        fig = ranked_bar(seg.index, seg["porsi"] * 100, highlight=len(seg) - 1,
+                         value_fmt="{:.0f}%",
+                         title=f"Segmen Premium (25% transaksi teratas) = "
+                               f"{seg['porsi'].iloc[-1]:.0%} omzet", height=360)
+        st.plotly_chart(fig, use_container_width=True)
+with k2:
+    if "basket_size" in df_f.columns:
+        keranjang = df_f.groupby("basket_size", observed=True).agg(
+            trx=("total_amount", "size"), omzet=("total_amount", "sum"))
+        keranjang["porsi"] = keranjang["omzet"] / omzet
+        fig = ranked_bar(keranjang.index, keranjang["porsi"] * 100,
+                         highlight=int(np.argmax(keranjang["porsi"].values)),
+                         value_fmt="{:.0f}%",
+                         title="Kontribusi omzet menurut ukuran keranjang", height=360)
+        st.plotly_chart(fig, use_container_width=True)
 
-with col_d:
-    st.markdown(
-        "<div class='chart-card'><h3>Avg Transaction Value by Age Group</h3></div>",
-        unsafe_allow_html=True,
-    )
-    age_avg = df_filtered.groupby("customer_age_group").agg(
-        avg_transaction=("total_amount", "mean"),
-    ).reset_index()
-    fig4 = bar_chart(age_avg, "customer_age_group", "avg_transaction", title="", height=360)
-    fig4.update_layout(xaxis_title="Age Group", yaxis_title="Avg Transaction ($)")
-    st.plotly_chart(fig4, use_container_width=True)
+if "value_segment" in df_f.columns:
+    render_takeaway(
+        f"Segmen <b>Premium</b> — 25% transaksi bernilai tertinggi — menyumbang "
+        f"<b>{seg['porsi'].iloc[-1]:.0%} omzet</b>, sementara segmen Rendah dengan jumlah "
+        f"transaksi yang sama hanya {seg['porsi'].iloc[0]:.0%}. "
+        f"Artinya <b>nilai transaksi jauh lebih penting daripada jumlah transaksi</b>. "
+        f"Program yang menaikkan nilai keranjang (attach merchandise, upsize) akan lebih "
+        f"berdampak daripada program yang mengejar jumlah kunjungan.")
 
-st.markdown("")
+# ── Langkah 3 — apakah ada segmen demografis ─────────────────────────────────
+render_step(3, "Apakah ada segmen pelanggan yang berbeda?",
+            "Kalau demografi tidak membedakan perilaku, segmentasi berbasis demografi "
+            "hanya membuang anggaran.")
 
-col_e, col_f = st.columns(2)
-with col_e:
-    if "customer_gender" in df_filtered.columns:
+k1, k2 = st.columns([5, 5])
+with k1:
+    usia = df_f.groupby("customer_age_group", observed=True)["total_amount"].sum()
+    usia_bersih = usia.drop("Tidak Diketahui", errors="ignore").sort_values()
+    fig = ranked_bar(usia_bersih.index, usia_bersih.values, highlight=None,
+                     accent=GREY, title="Omzet per kelompok usia", height=360)
+    st.plotly_chart(fig, use_container_width=True)
+with k2:
+    nilai_usia = df_f.groupby("customer_age_group", observed=True)["total_amount"].mean()
+    nilai_bersih = nilai_usia.drop("Tidak Diketahui", errors="ignore").sort_values()
+    fig = ranked_bar(nilai_bersih.index, nilai_bersih.values, highlight=None,
+                     accent=GREY, value_fmt="${:.2f}",
+                     title="Nilai transaksi rata-rata per kelompok usia", height=360)
+    st.plotly_chart(fig, use_container_width=True)
+
+sebar_omzet = usia_bersih.max() / usia_bersih.min() - 1
+sebar_nilai = nilai_bersih.max() / nilai_bersih.min() - 1
+render_takeaway(
+    f"<b>Tidak ada segmen demografis yang berbeda.</b> Perbedaan omzet antar kelompok "
+    f"usia {sebar_omzet:.0%} sebagian besar hanya mencerminkan berapa banyak orang di "
+    f"tiap kelompok. Yang lebih menentukan adalah grafik kanan: <b>nilai transaksi "
+    f"rata-rata hanya berbeda {sebar_nilai:.0%}</b> dari kelompok tertinggi ke terendah — "
+    f"pelanggan 18-24 dan 65+ berbelanja dengan nilai yang praktis sama. "
+    f"<b>Segmentasi berdasarkan usia atau gender tidak akan menghasilkan apa pun.</b> "
+    f"Segmen yang benar-benar berbeda di bisnis ini adalah <b>waktu dan lokasi</b>.")
+
+# ── Langkah 4 — program loyalty ──────────────────────────────────────────────
+if "loyalty_member" in df_f.columns and df_f["loyalty_member"].nunique() > 1:
+    render_step(4, "Apakah program loyalty bekerja?",
+                "Program ini punya tiga klaim. Kita uji ketiganya ke data.")
+
+    anggota = df_f[df_f["loyalty_member"]]
+    non = df_f[~df_f["loyalty_member"]]
+    vis = df_f.groupby("customer_id").agg(n=("transaction_id", "size"),
+                                          m=("loyalty_member", "first"))
+    ret_a = (vis.loc[vis["m"], "n"] > 1).mean()
+    ret_n = (vis.loc[~vis["m"], "n"] > 1).mean()
+
+    k1, k2 = st.columns([6, 4])
+    with k1:
+        fig = compare_bar(
+            ["Sering dapat diskon (%)", "Datang lagi (%)", "Belanja sebelum diskon ($)"],
+            {"Non-anggota": [non["is_discounted"].mean() * 100, ret_n * 100,
+                             non["gross_amount"].mean()],
+             "Anggota loyalty": [anggota["is_discounted"].mean() * 100, ret_a * 100,
+                                 anggota["gross_amount"].mean()]},
+            colors=[GREY, RED], title="Tiga klaim program loyalty, diuji ke data",
+            height=380)
+        st.plotly_chart(fig, use_container_width=True)
+    with k2:
+        UJI = pd.DataFrame([
+            ("Datang lebih sering?", f"{ret_a:.2%}", f"{ret_n:.2%}", "Tidak ada beda"),
+            ("Belanja lebih besar?", f"${anggota['gross_amount'].mean():.2f}",
+             f"${non['gross_amount'].mean():.2f}", "Anggota LEBIH KECIL"),
+            ("Sering dapat diskon?", f"{anggota['is_discounted'].mean():.1%}",
+             f"{non['is_discounted'].mean():.1%}",
+             f"{anggota['is_discounted'].mean()/non['is_discounted'].mean():.1f}x"),
+        ], columns=["Klaim", "Anggota", "Non-anggota", "Hasil"])
+        st.dataframe(UJI, hide_index=True, use_container_width=True, height=180)
+        porsi = anggota["discount_amount"].sum() / df_f["discount_amount"].sum()
         st.markdown(
-            "<div class='chart-card'><h3>Revenue by Gender</h3></div>",
-            unsafe_allow_html=True,
-        )
-        gender_rev = (
-            df_filtered.groupby("customer_gender")["total_amount"]
-            .sum()
-            .reset_index()
-            .sort_values("total_amount", ascending=False)
-        )
-        fig5 = bar_chart(gender_rev, "customer_gender", "total_amount", title="", height=340)
-        fig5.update_layout(xaxis_title="Gender", yaxis_title="Revenue ($)")
-        st.plotly_chart(fig5, use_container_width=True)
+            f"<div style='font-size:0.86rem;color:#374151;line-height:1.7;'>"
+            f"Anggota = <b>{df_f['loyalty_member'].mean():.0%} transaksi</b><br>"
+            f"tapi menyerap <b>{porsi:.0%} biaya diskon</b><br>"
+            f"= <b>{format_currency(anggota['discount_amount'].sum())}/tahun</b></div>",
+            unsafe_allow_html=True)
 
-with col_f:
-    if "loyalty_member" in df_filtered.columns:
-        st.markdown(
-            "<div class='chart-card'><h3>Loyalty Member Distribution</h3></div>",
-            unsafe_allow_html=True,
-        )
-        loyalty_rev = (
-            df_filtered.groupby("loyalty_member")["total_amount"]
-            .sum()
-            .reset_index()
-        )
-        loyalty_rev["label"] = loyalty_rev["loyalty_member"].map({True: "Loyalty Member", False: "Non-Member"})
-        fig6 = bar_chart(loyalty_rev, "label", "total_amount", title="", height=340)
-        st.plotly_chart(fig6, use_container_width=True)
+    render_takeaway(
+        f"<b>Program ini gagal di ketiga klaimnya sendiri.</b> Anggota tidak datang lebih "
+        f"sering ({ret_a:.2%} vs {ret_n:.2%}), tidak belanja lebih besar (justru "
+        f"{format_currency(non['gross_amount'].mean()-anggota['gross_amount'].mean())} "
+        f"lebih kecil sebelum diskon), dan mendapat diskon "
+        f"{anggota['is_discounted'].mean()/non['is_discounted'].mean():.1f}x lebih sering. "
+        f"Ini bukan program loyalitas — ini <b>potongan harga tanpa syarat</b> untuk orang "
+        f"yang perilakunya tidak berubah. "
+        f"<b>Tapi jangan langsung dibatalkan:</b> satu tahun data tidak bisa melihat efek "
+        f"merek atau pelanggan yang akan pergi. Jalankan <b>uji holdout di ⅓ toko selama "
+        f"satu kuartal</b>, lalu putuskan dengan bukti.",
+        alert=True)
 
-st.markdown("")
+# ── Langkah 5 — kesimpulan ───────────────────────────────────────────────────
+render_step(5, "Jadi siapa pelanggan utama kita?", "Kesimpulan yang bisa dipertahankan.")
 
-top_age = age_rev.iloc[0]["customer_age_group"]
-top_age_rev = age_rev.iloc[0]["total_amount"]
-top_age_pct = top_age_rev / total_rev * 100
-loyalty_share = (
-    df_filtered["loyalty_member"].value_counts(normalize=True).get(True, 0) * 100
-    if "loyalty_member" in df_filtered.columns else 0
-)
+st.markdown(
+    f"""
+    <div style="background:#F3F1FA;border-radius:12px;padding:20px 24px;
+                font-size:0.92rem;color:#374151;line-height:1.85;">
+    <b style="color:#1C174D;">Pelanggan utama kita bukan sebuah demografi — melainkan
+    sebuah kejadian.</b><br><br>
+    Bukan "wanita 25-34" atau "anggota loyalty", karena kedua kelompok itu tidak
+    berperilaku berbeda dari siapa pun. Pelanggan utama kita adalah
+    <b>orang yang lewat antara pukul 06:00 dan 10:00</b> — siapa pun dia.<br><br>
+    Konsekuensinya untuk marketing:
+    <br>• Berhenti membeli data segmentasi demografis — tidak ada sinyal di sana
+    <br>• Alihkan ke <b>penawaran berbasis waktu dan lokasi</b>
+    <br>• Naikkan <b>nilai keranjang</b>, bukan jumlah kunjungan — karena kunjungan
+    ulang praktis tidak ada dan tidak bisa diukur
+    </div>
+    """, unsafe_allow_html=True)
 
-col_i1, col_i2, col_i3 = st.columns(3)
-with col_i1:
-    st.markdown(
-        f"<div class='insight-card'><strong>Top Age Group:</strong> {top_age} contributes "
-        f"{format_currency(top_age_rev)} ({format_percentage(top_age_pct)})</div>",
-        unsafe_allow_html=True,
-    )
-with col_i2:
-    st.markdown(
-        f"<div class='insight-card'><strong>Repeat Rate:</strong> {format_percentage(repeat_rate)} customers "
-        f"made more than one transaction</div>",
-        unsafe_allow_html=True,
-    )
-with col_i3:
-    st.markdown(
-        f"<div class='insight-card'><strong>Loyalty Members:</strong> {format_percentage(loyalty_share)} "
-        f"of customers are loyalty program members</div>",
-        unsafe_allow_html=True,
-    )
+render_caveat(
+    f"<b>Batasan halaman ini.</b> {sekali:.0%} pelanggan hanya muncul sekali, sehingga "
+    f"CLV, churn, cohort, dan daftar 'pelanggan VIP' <b>tidak dilaporkan</b> di dashboard "
+    f"ini — bukan karena tidak dibuat, tapi karena angkanya tidak akan bertahan saat "
+    f"ditanya. Grafik 'Top 10 Pelanggan' sengaja dihilangkan: dengan data seperti ini, "
+    f"grafik itu hanya menampilkan sepuluh ID acak yang kebetulan membeli barang mahal "
+    f"satu kali, dan akan menyesatkan pembaca seolah kita punya pelanggan VIP.")
 
 st.markdown("")
-st.download_button(
-    "Download Customer Summary",
-    data=cust_rev.to_csv(index=False),
-    file_name="customer_summary.csv",
-    mime="text/csv",
-)
+st.download_button("Unduh Data Pelanggan (CSV)",
+                   data=df_f.groupby("customer_id").agg(
+                       kunjungan=("transaction_id", "size"),
+                       total_belanja=("total_amount", "sum"),
+                       rata_transaksi=("total_amount", "mean"),
+                       anggota_loyalty=("loyalty_member", "first")).to_csv(),
+                   file_name="ringkasan_pelanggan.csv", mime="text/csv")

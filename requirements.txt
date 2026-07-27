@@ -1,5 +1,18 @@
+# Dependensi DASHBOARD saja.
+#
+# File ini yang dibaca Streamlit Community Cloud saat deploy, jadi isinya
+# sengaja dijaga minimal supaya build cepat. Dependensi notebook (matplotlib,
+# seaborn, nbformat) ada di requirements-notebook.txt dan TIDAK perlu di server.
+
 streamlit>=1.30.0
 pandas>=2.0.0
 numpy>=1.24.0
 plotly>=5.18.0
-openpyxl>=3.1.0
+
+# Catatan kompatibilitas plotly:
+# plotly >= 6.0 mengirim array numpy sebagai biner {"dtype","bdata"}, sedangkan
+# Plotly.js yang dibundel Streamlit lama (mis. 1.31) belum mengenalinya —
+# grafik tetap tampil tapi menggambar indeks, bukan nilai, TANPA pesan error.
+# Kode di utils/charts.py sudah dibuat kebal versi (semua data dikonversi ke
+# list Python biasa), jadi kombinasi versi mana pun aman.
+# Verifikasi dengan: python scripts/check_charts.py

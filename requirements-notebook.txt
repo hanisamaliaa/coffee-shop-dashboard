@@ -1,0 +1,10 @@
+# Dependensi tambahan untuk menjalankan coffee_shop_complete_colab.ipynb.
+# TIDAK dibutuhkan dashboard — jangan gabungkan ke requirements.txt, karena
+# Streamlit Cloud akan ikut menginstalnya dan build jadi lambat tanpa manfaat.
+
+-r requirements.txt
+
+matplotlib>=3.7.0
+seaborn>=0.12.0
+nbformat>=5.9.0
+openpyxl>=3.1.0

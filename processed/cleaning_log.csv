@@ -1,0 +1,9 @@
+langkah,kolom,tindakan,baris_terdampak,alasan
+1,timestamp,object -> datetime64,20000,tanpa datetime tidak bisa buat fitur waktu
+2,weather_condition,diisi dari kota-hari yang sama,974,"cuaca = properti kota-hari, nilai asli ada di dataset"
+2,temperature_c,diisi dari median kota-hari yang sama,974,"suhu = properti kota-hari, nilai asli ada di dataset"
+2,weather_condition,sisanya -> 'Tidak Tercatat',4,"jujur bilang tidak tahu, daripada mengarang"
+2,temperature_c,sisanya -> median kota-bulan,4,perkiraan terdekat yang masih masuk akal secara geografis
+3,holiday_name,NaN -> 'Bukan Hari Libur' + flag is_holiday,19665,kosong = hari itu memang bukan hari libur
+4,customer_age_group,NaN -> 'Tidak Diketahui',1076,"kategori sendiri, tidak digabung dgn 'Prefer not to say'"
+4,customer_gender,NaN -> 'Tidak Diketahui',1072,"kategori sendiri, tidak digabung dgn 'Prefer not to say'"

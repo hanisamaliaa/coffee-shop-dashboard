@@ -10,6 +10,10 @@ COLORS = {
     "card_bg": "#FFFFFF",
     "card_border": "#E5E7EB",
     "text_primary": "#1C174D",
+    # Warna teks isi. Sengaja dipisah dari text_primary (navy) karena navy
+    # terlalu pekat untuk paragraf panjang, dan dipakai sebagai penangkal
+    # kalau tema gelap Streamlit membuat teks bawaan jadi putih.
+    "text_primary_body": "#1F2937",
     "text_secondary": "#6B7280",
     "text_muted": "#9CA3AF",
 }
@@ -33,6 +37,7 @@ def inject_global_css():
             --card-bg: {COLORS['card_bg']};
             --card-border: {COLORS['card_border']};
             --text-primary: {COLORS['text_primary']};
+            --text-primary-body: {COLORS['text_primary_body']};
             --text-secondary: {COLORS['text_secondary']};
         }}
 
@@ -42,15 +47,84 @@ def inject_global_css():
             font-family: {FONT_FAMILY};
         }}
 
+        /* ── Pertahanan kontras ──────────────────────────────────────────
+           Seluruh CSS di bawah memakai palet TERANG (kartu putih, teks navy).
+           Kalau Streamlit terlanjur memakai tema gelap — entah karena OS
+           pengguna dark mode atau karena tema diganti dari menu Streamlit —
+           teks bawaannya menjadi putih dan hilang di atas kartu putih kita.
+
+           .streamlit/config.toml sudah mengunci base="light". Blok ini adalah
+           lapis kedua supaya dashboard tetap terbaca walau config itu hilang
+           atau ditimpa. */
+        .stApp, .stApp p, .stApp li, .stApp label,
+        .stApp .stMarkdown, [data-testid="stCaptionContainer"],
+        [data-testid="stMetricValue"], [data-testid="stDataFrame"],
+        [data-testid="stExpander"] summary,
+        .stDataFrame, .stTable {{
+            color: var(--text-primary-body);
+        }}
+
+        /* Sidebar — sumber keluhan paling sering: label filter jadi tak
+           terlihat karena teks putih di atas latar putih. */
         section[data-testid="stSidebar"] {{
             background-color: #FFFFFF;
             border-right: 1px solid var(--card-border);
+        }}
+
+        section[data-testid="stSidebar"] * {{
+            color: var(--text-primary-body);
+        }}
+
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] [data-testid="stWidgetLabel"],
+        section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {{
+            color: var(--navy) !important;
+            font-weight: 600;
+            font-size: 0.84rem;
         }}
 
         section[data-testid="stSidebar"] .stMarkdown h1,
         section[data-testid="stSidebar"] .stMarkdown h2,
         section[data-testid="stSidebar"] .stMarkdown h3 {{
             color: var(--navy);
+        }}
+
+        /* Kotak input di sidebar: multiselect, date input, dropdown */
+        section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+        section[data-testid="stSidebar"] [data-baseweb="input"] > div,
+        section[data-testid="stSidebar"] [data-testid="stDateInput"] input {{
+            background-color: #FFFFFF !important;
+            border-color: var(--card-border) !important;
+            color: var(--text-primary-body) !important;
+        }}
+
+        /* Tag terpilih di multiselect */
+        section[data-testid="stSidebar"] [data-baseweb="tag"] {{
+            background-color: var(--teal) !important;
+        }}
+        section[data-testid="stSidebar"] [data-baseweb="tag"] span {{
+            color: #FFFFFF !important;
+        }}
+
+        /* Menu dropdown mengambang — dirender di luar sidebar */
+        [data-baseweb="popover"] li,
+        [data-baseweb="popover"] div {{
+            color: var(--text-primary-body);
+        }}
+
+        /* Navigasi halaman di sidebar */
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span {{
+            color: var(--text-primary-body) !important;
+        }}
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] span {{
+            color: var(--navy) !important;
+            font-weight: 700;
+        }}
+
+        /* Tabel: teks bawaan ikut tema, latarnya milik kita */
+        [data-testid="stDataFrame"] {{
+            background-color: #FFFFFF;
+            border-radius: 10px;
         }}
 
         /* Hide default Streamlit padding */
@@ -318,6 +392,76 @@ def inject_global_css():
             color: #92400E;
             line-height: 1.6;
         }}
+
+        /* "Apa artinya" — kesimpulan di bawah setiap grafik.
+           Grafik tanpa kesimpulan tidak menjawab apa pun. */
+        .takeaway {{
+            background: {COLORS['purple_light']};
+            border-left: 4px solid {COLORS['teal']};
+            border-radius: 0 8px 8px 0;
+            padding: 12px 18px;
+            margin: 4px 0 22px 0;
+            font-size: 0.87rem;
+            color: #374151;
+            line-height: 1.65;
+        }}
+        .takeaway .tl {{
+            display: block;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: {COLORS['teal']};
+            margin-bottom: 5px;
+        }}
+        .takeaway strong {{ color: {COLORS['navy']}; font-weight: 700; }}
+        .takeaway.alert {{
+            background: #FEF2F2;
+            border-left-color: {COLORS['red']};
+        }}
+        .takeaway.alert .tl {{ color: {COLORS['red']}; }}
+
+        /* Header langkah bernomor — supaya halaman terbaca berurutan */
+        .step {{
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin: 30px 0 6px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid {COLORS['card_border']};
+        }}
+        .step .num {{
+            flex: none;
+            width: 27px; height: 27px;
+            border-radius: 7px;
+            background: {COLORS['navy']};
+            color: #fff;
+            font-size: 0.78rem; font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            transform: translateY(3px);
+        }}
+        .step .txt h4 {{
+            margin: 0; padding: 0;
+            font-size: 1.06rem; font-weight: 800;
+            color: {COLORS['navy']};
+        }}
+        .step .txt p {{
+            margin: 2px 0 0 0;
+            font-size: 0.82rem; color: {COLORS['text_secondary']};
+        }}
+
+        /* Baris caveat kecil di kaki halaman */
+        .caveat {{
+            background: #FFFBEB;
+            border: 1px solid #FDE68A;
+            border-radius: 8px;
+            padding: 11px 16px;
+            font-size: 0.79rem;
+            color: #92400E;
+            line-height: 1.6;
+            margin-top: 8px;
+        }}
+        .caveat b {{ color: #78350F; }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -426,3 +570,35 @@ def render_chart_card(title, subtitle=None):
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_step(number, title, question=None):
+    """Header langkah bernomor. Setiap halaman dibaca berurutan 1, 2, 3."""
+    q = f"<p>{question}</p>" if question else ""
+    st.markdown(
+        f"""
+        <div class="step">
+            <div class="num">{number}</div>
+            <div class="txt"><h4>{title}</h4>{q}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_takeaway(text, alert=False, label="Apa artinya"):
+    """Kesimpulan satu paragraf di bawah grafik.
+
+    Aturan main: setiap grafik di dashboard ini wajib punya satu. Grafik tanpa
+    kesimpulan memaksa pembaca menebak sendiri apa yang harus dilakukan.
+    """
+    css = "takeaway alert" if alert else "takeaway"
+    st.markdown(
+        f'<div class="{css}"><span class="tl">{label}</span>{text}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_caveat(text):
+    """Batasan analisis. Ditulis di halaman, bukan disembunyikan di catatan kaki."""
+    st.markdown(f'<div class="caveat">{text}</div>', unsafe_allow_html=True)
